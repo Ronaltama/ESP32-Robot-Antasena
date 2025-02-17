@@ -1,9 +1,19 @@
+
 #include <WiFi.h>
 #include <esp_now.h>
 
-// Pin motor
-const int motorPins[8] = {0, 1, 2, 3, 4, 5, 6, 7};
-const int pwmChannels[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+#define RPWM_PIN1 18
+#define LPWM_PIN1 19
+#define RPWM_PIN2 21
+#define LPWM_PIN2 22
+#define RPWM_PIN3 23
+#define LPWM_PIN3 25
+#define RPWM_PIN4 26
+#define LPWM_PIN4 27
+
+// // Pin motor
+// const int motorPins[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+// const int pwmChannels[8] = {0, 1, 2, 3, 4, 5, 6, 7};
 
 // Struktur data joystick (binary)
 typedef struct {
@@ -60,10 +70,10 @@ void onReceiveData(const esp_now_recv_info_t *info, const uint8_t *data, int len
 
     Serial.printf("M1: %d | M2: %d | M3: %d | M4: %d\n", m1, m2, m3, m4);
 
-    setMotorSpeed(motorPins[0], motorPins[1], m1, "M1");
-    setMotorSpeed(motorPins[2], motorPins[3], m2, "M2");
-    setMotorSpeed(motorPins[4], motorPins[5], m3, "M3");
-    setMotorSpeed(motorPins[6], motorPins[7], m4, "M4");
+    setMotorSpeed(RPWM_PIN1, LPWM_PIN1, m1, "M1");
+    setMotorSpeed(RPWM_PIN2, LPWM_PIN2, m2, "M2");
+    setMotorSpeed(RPWM_PIN3, LPWM_PIN3, m3, "M3");
+    setMotorSpeed(RPWM_PIN4, LPWM_PIN4, m4, "M4");
 }
 
 void setup() {
