@@ -3,21 +3,10 @@
 #include <ArduinoJson.h>
 #include <Bluepad32.h>
 
-// MAC Address ESP2 (Penerima)
+// MAC Address ESP Penerima
 uint8_t receiverMAC[] = {0xEC, 0x62, 0x60, 0x33, 0xFA, 0xD0};
 
 GamepadPtr myGamepad = nullptr;
-
-// Struktur data joystick (untuk penyimpanan)
-typedef struct {
-    int xLeft;
-    int yLeft;
-    int z;
-    int btnA;
-    int btnB;
-} JoystickData;
-
-JoystickData joystickData;
 
 // Callback saat gamepad terhubung
 void onConnectedGamepad(GamepadPtr gp) {
@@ -65,19 +54,20 @@ void loop() {
     BP32.update();
 
     if (myGamepad && myGamepad->isConnected()) {
-        joystickData.xLeft = myGamepad->axisX();
-        joystickData.yLeft = -myGamepad->axisY();
-        joystickData.z = myGamepad->axisRX();
-        joystickData.btnA = myGamepad->a() ? 1 : 0;
-        joystickData.btnB = myGamepad->b() ? 1 : 0;
+        // Ambil data joystick
+        int xLeft = myGamepad->axisX();
+        int yLeft = -myGamepad->axisY() + 4;
+        int z = myGamepad->axisRX();
+        int btnA = myGamepad->a() ? 1 : 0;
+        int btnB = myGamepad->b() ? 1 : 0;
 
         // Serialize data ke JSON
         StaticJsonDocument<200> doc;
-        doc["xLeft"] = joystickData.xLeft;
-        doc["yLeft"] = joystickData.yLeft;
-        doc["z"] = joystickData.z;
-        doc["A"] = joystickData.btnA;
-        doc["B"] = joystickData.btnB;
+        doc["xLeft"] = xLeft;
+        doc["yLeft"] = yLeft;
+        doc["z"] = z;
+        doc["A"] = btnA;
+        doc["B"] = btnB;
 
         char jsonBuffer[256];
         size_t jsonLen = serializeJson(doc, jsonBuffer, sizeof(jsonBuffer));
@@ -90,5 +80,5 @@ void loop() {
         Serial.printf("Sent JSON: %s\n", jsonBuffer);
     }
 
-    delay(100);
+    delay(10);
 }
