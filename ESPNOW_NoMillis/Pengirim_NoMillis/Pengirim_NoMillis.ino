@@ -13,21 +13,23 @@ GamepadPtr myGamepad = nullptr;
 
 // Callback saat gamepad terhubung
 void onConnectedGamepad(GamepadPtr gp) {
-    //Serial.println("Gamepad Connected!");
     myGamepad = gp;
 }
 
 // Callback saat gamepad terputus
 void onDisconnectedGamepad(GamepadPtr gp) {
-    //Serial.println("Gamepad Disconnected!");
     myGamepad = nullptr;
 }
 
 // Callback saat ESP-NOW mengirim data
 void onSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-    //Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Sent Successfully" : "Send Failed");
-    if (status != ESP_NOW_SEND_SUCCESS) {
-        Serial.println("Send Failed");
+    if (memcmp(mac_addr, receiverMAC, 6) == 0) { // Pastikan MAC address cocok dengan penerima
+        Serial.print("Data sent to: ");
+        for (int i = 0; i < 6; i++) {
+            Serial.printf("%02X", mac_addr[i]);
+            if (i < 5) Serial.print(":");
+        }
+        Serial.println(status == ESP_NOW_SEND_SUCCESS ? " - Sent Successfully" : " - Send Failed");
     }
 }
 
@@ -42,7 +44,6 @@ void setup() {
     esp_now_register_send_cb(onSent);
 
     esp_now_peer_info_t peerInfo = {};
-    //memset(&peerInfo, 0, sizeof(peerInfo));
     memcpy(peerInfo.peer_addr, receiverMAC, 6);
     peerInfo.channel = 0;
     peerInfo.encrypt = false;
@@ -72,5 +73,5 @@ void loop() {
         esp_now_send(receiverMAC, (uint8_t *)jsonBuffer, jsonLen);
     }
 
-    //delay(10);
+    delay(0);
 }
