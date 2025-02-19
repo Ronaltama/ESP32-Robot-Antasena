@@ -15,4 +15,4 @@ Proyek ini adalah sistem kontrol robot menggunakan ESP32 dan ESP-NOW.
 ## 🚀 Instalasi
 1. Clone repository ini:
    ```sh
-   git clone https://github.com/ronaltama/ESP32-Robot-Control.git
+   git clone https://github.com/ronaltama/ESP32-Robot-Antasena.git
