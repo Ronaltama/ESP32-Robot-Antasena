@@ -76,11 +76,15 @@ void loop() {
         int yLeft = myGamepad->axisY();
         int z = myGamepad->axisRX();
 
+        int l1 = 0; // belum konek ke gamepad tombol L1, buat nge rem (nilai 0 atau 1)
+        int l2 = 0; // sama aja tapi buat nge gas (nilai 0 atau 1)
+        int acc = 1 - l1 + l2; // untuk menghitung kecepatan motor, normal = 1, cepet = 2, stop = 0
+
         // Hitung kecepatan motor
-        int m1 = constrain(xLeft + yLeft + z, -80, 80);
-        int m2 = constrain(xLeft - yLeft + z, -80, 80);
-        int m3 = constrain(-xLeft + yLeft + z, -80, 80);
-        int m4 = constrain(-xLeft - yLeft + z, -80, 80);
+        int m1 = constrain(xLeft + yLeft + z, -100, 100) * acc;
+        int m2 = constrain(xLeft - yLeft + z, -100, 100) * acc;
+        int m3 = constrain(-xLeft + yLeft + z, -100, 100) * acc;
+        int m4 = constrain(-xLeft - yLeft + z, -100, 100) * acc;
 
         // Set motor berdasarkan nilai yang dihitung
         setMotorSpeed(LEDC_CHANNEL_1A, LEDC_CHANNEL_1B, m1);
