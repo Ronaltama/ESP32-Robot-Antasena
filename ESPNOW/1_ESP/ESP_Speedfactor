@@ -1,0 +1,138 @@
+#include <WiFi.h>
+#include <Bluepad32.h>
+
+// Definisi Pin Motor
+#define RPWM_PIN1 18
+#define LPWM_PIN1 19
+#define RPWM_PIN2 21
+#define LPWM_PIN2 22
+#define RPWM_PIN3 23
+#define LPWM_PIN3 25
+#define RPWM_PIN4 26
+#define LPWM_PIN4 27
+
+// Definisi Channel LEDC untuk PWM
+#define LEDC_CHANNEL_1A  0  
+#define LEDC_CHANNEL_1B  1  
+#define LEDC_CHANNEL_2A  2  
+#define LEDC_CHANNEL_2B  3  
+#define LEDC_CHANNEL_3A  4  
+#define LEDC_CHANNEL_3B  5  
+#define LEDC_CHANNEL_4A  6  
+#define LEDC_CHANNEL_4B  7  
+
+#define LEDC_FREQ        5000  
+#define LEDC_RESOLUTION  8
+
+GamepadPtr myGamepad = nullptr;
+
+// Timer untuk update motor
+unsigned long lastUpdateTime = 0;
+const unsigned long updateInterval = 10; // Update motor setiap 10ms
+unsigned long lastButtonPress = 0;
+const unsigned long buttonDebounce = 300; // Debounce tombol
+
+// Variabel kecepatan motor yang diperhalus
+int currentM1 = 0, currentM2 = 0, currentM3 = 0, currentM4 = 0;
+const int accelerationStep = 5; // Perubahan kecepatan maksimal per update
+
+// Callback saat gamepad terhubung
+void onGamepadConnected(GamepadPtr gp) {
+    myGamepad = gp;
+    Serial.println("Gamepad Connected!");
+}
+
+// Callback saat gamepad terputus
+void onGamepadDisconnected(GamepadPtr gp) {
+    myGamepad = nullptr;
+    Serial.println("Gamepad Disconnected!");
+}
+
+// Fungsi untuk mengontrol motor dengan PWM
+void setMotorSpeed(int channelA, int channelB, int speed) {
+    int pwmValue = abs(speed);
+    bool forward = (speed > 0);
+    ledcWrite(channelA, forward ? pwmValue : 0);
+    ledcWrite(channelB, forward ? 0 : pwmValue);
+}
+
+// Fungsi untuk memperhalus perubahan kecepatan motor
+void smoothMotorUpdate(int targetM1, int targetM2, int targetM3, int targetM4) {
+    unsigned long currentMillis = millis();
+    
+    if (currentMillis - lastUpdateTime >= updateInterval) {
+        lastUpdateTime = currentMillis;
+
+        // Perhalus perubahan kecepatan motor
+        currentM1 += constrain(targetM1 - currentM1, -accelerationStep, accelerationStep);
+        currentM2 += constrain(targetM2 - currentM2, -accelerationStep, accelerationStep);
+        currentM3 += constrain(targetM3 - currentM3, -accelerationStep, accelerationStep);
+        currentM4 += constrain(targetM4 - currentM4, -accelerationStep, accelerationStep);
+
+        // Terapkan ke motor
+        setMotorSpeed(LEDC_CHANNEL_1A, LEDC_CHANNEL_1B, currentM1);
+        setMotorSpeed(LEDC_CHANNEL_2A, LEDC_CHANNEL_2B, currentM2);
+        setMotorSpeed(LEDC_CHANNEL_3A, LEDC_CHANNEL_3B, currentM3);
+        setMotorSpeed(LEDC_CHANNEL_4A, LEDC_CHANNEL_4B, currentM4);
+
+        Serial.printf("Smooth M1: %d, M2: %d, M3: %d, M4: %d\n", currentM1, currentM2, currentM3, currentM4);
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+
+    // Inisialisasi PWM
+    for (int i = 0; i < 8; i++) {
+        ledcSetup(i, LEDC_FREQ, LEDC_RESOLUTION);
+    }
+
+    // Attach GPIO ke channel LEDC
+    ledcAttachPin(RPWM_PIN1, LEDC_CHANNEL_1A);
+    ledcAttachPin(LPWM_PIN1, LEDC_CHANNEL_1B);
+    ledcAttachPin(RPWM_PIN2, LEDC_CHANNEL_2A);
+    ledcAttachPin(LPWM_PIN2, LEDC_CHANNEL_2B);
+    ledcAttachPin(RPWM_PIN3, LEDC_CHANNEL_3A);
+    ledcAttachPin(LPWM_PIN3, LEDC_CHANNEL_3B);
+    ledcAttachPin(RPWM_PIN4, LEDC_CHANNEL_4A);
+    ledcAttachPin(LPWM_PIN4, LEDC_CHANNEL_4B);
+
+    // Inisialisasi Bluetooth Gamepad
+    BP32.setup(onGamepadConnected, onGamepadDisconnected);
+}
+
+void loop() {
+    BP32.update();
+
+    if (myGamepad && myGamepad->isConnected()) {
+        unsigned long currentMillis = millis();
+        int xLeft = -myGamepad->axisX();
+        int yLeft = myGamepad->axisY();
+        int z = myGamepad->axisRX();
+        static int speedFactor = 80;  // Nilai kecepatan default
+
+        // Cek tombol R2 dan L2 untuk mengatur kecepatan dengan debounce
+        if ((myGamepad->buttons() & (1 << 9)) && (currentMillis - lastButtonPress > buttonDebounce)) { // Tombol R2
+            speedFactor = min(speedFactor + 10, 255);
+            Serial.printf("Speed Up: %d\n", speedFactor);
+            lastButtonPress = currentMillis;
+        }
+        if ((myGamepad->buttons() & (1 << 8)) && (currentMillis - lastButtonPress > buttonDebounce)) { // Tombol L2
+            speedFactor = max(speedFactor - 10, 0);
+            Serial.printf("Speed Down: %d\n", speedFactor);
+            lastButtonPress = currentMillis;
+        }
+
+        // Hitung target kecepatan motor berdasarkan joystick
+        int targetM1 = constrain((xLeft + yLeft + z) * speedFactor / 100, -255, 255);
+        int targetM2 = constrain((xLeft - yLeft + z) * speedFactor / 100, -255, 255);
+        int targetM3 = constrain((-xLeft + yLeft + z) * speedFactor / 100, -255, 255);
+        int targetM4 = constrain((-xLeft - yLeft + z) * speedFactor / 100, -255, 255);
+
+        // Gunakan fungsi smoothing untuk motor
+        smoothMotorUpdate(targetM1, targetM2, targetM3, targetM4);
+
+        Serial.printf("xLeft: %d, yLeft: %d, z: %d\n", xLeft, yLeft, z);
+        Serial.printf("Target M1: %d, M2: %d, M3: %d, M4: %d\n", targetM1, targetM2, targetM3, targetM4);
+    }
+}
