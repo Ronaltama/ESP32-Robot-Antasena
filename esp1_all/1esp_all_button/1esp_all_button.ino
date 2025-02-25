@@ -12,8 +12,6 @@
 #define LPWM_PIN4 22
 
 
-
-
 // Definisi Channel LEDC untuk PWM
 #define LEDC_CHANNEL_1A  0  
 #define LEDC_CHANNEL_1B  1  
