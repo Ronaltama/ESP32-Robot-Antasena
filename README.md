@@ -1,16 +1,15 @@
-# ESP32 Robot Control via ESP-NOW
+# ESP32 Robot Control 
 
-Proyek ini adalah sistem kontrol robot menggunakan ESP32 dan ESP-NOW.
+Proyek ini adalah sistem kontrol robot menggunakan ESP32 
 
 ## 📜 Fitur
-- Komunikasi nirkabel ESP-NOW
 - Mengontrol motor dengan joystick
-- Parsing data JSON dari pengirim
+- Mengolah data joystick ke esp
+- Mengolah data joystick untuk menjalankan motor
 
 ## 📂 Struktur Folder
-- `sender/` → Kode untuk pengirim ESP32
-- `receiver/` → Kode untuk penerima ESP32
-- `docs/` → Dokumentasi proyek
+- ESP32 -> hanya menggunakan 1 esp dengan bluetoth
+- ESPNOW -> menggunakan 2 esp untuk komunikasi
 
 ## 🚀 Instalasi
 1. Clone repository ini:
