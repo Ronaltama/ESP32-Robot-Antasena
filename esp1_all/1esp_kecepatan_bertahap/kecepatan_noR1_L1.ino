@@ -28,7 +28,7 @@ GamepadPtr myGamepad = nullptr;
 
 // Variabel untuk smoothing akselerasi
 float current_acc = 1.0;
-const float ACC_STEP = 0.05;  // Langkah perubahan akselerasi
+const float ACC_STEP = 0.5;  // Langkah perubahan akselerasi
 
 // Callback saat gamepad terhubung
 void onConnectedGamepad(GamepadPtr gp) {
@@ -84,7 +84,7 @@ void loop() {
 
         // Hitung target akselerasi
         float target_acc = 1 - r2 + l2; 
-        target_acc = constrain(target_acc, 0, 1.5);  // Batas percepatan agar tidak terlalu ekstrem
+        target_acc = constrain(target_acc, 0, 2.04);  // Batas percepatan agar tidak terlalu ekstrem
 
         // Smoothing akselerasi
         if (target_acc > current_acc) {
