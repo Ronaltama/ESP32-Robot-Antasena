@@ -2,10 +2,10 @@
 #include <Bluepad32.h>
 
 // Definisi Pin Motor
-#define RPWM_PIN1 23
-#define LPWM_PIN1 25
-#define RPWM_PIN2 18
-#define LPWM_PIN2 19
+#define RPWM_PIN1 18
+#define LPWM_PIN1 19
+#define RPWM_PIN2 32
+#define LPWM_PIN2 33
 #define RPWM_PIN3 14
 #define LPWM_PIN3 12
 #define RPWM_PIN4 21
