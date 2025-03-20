@@ -2,10 +2,10 @@
 #include <Bluepad32.h>
 
 // Definisi Pin Motor
-#define RPWM_PIN1 23
-#define LPWM_PIN1 25
-#define RPWM_PIN2 18
-#define LPWM_PIN2 19
+#define RPWM_PIN1 18
+#define LPWM_PIN1 19
+#define RPWM_PIN2 32
+#define LPWM_PIN2 33
 #define RPWM_PIN3 14
 #define LPWM_PIN3 12
 #define RPWM_PIN4 21
@@ -28,7 +28,7 @@ GamepadPtr myGamepad = nullptr;
 
 // Variabel akselerasi & deadzone joystick
 float current_acc = 1.0;
-const float ACC_STEP = 0.05;  // Langkah perubahan akselerasi
+const float ACC_STEP = 0.1;  // Langkah perubahan akselerasi
 #define DEADZONE 10  
 
 // Callback saat gamepad terhubung
@@ -87,7 +87,7 @@ void loop() {
         int yLeft = applyDeadzone(-myGamepad->axisY() + 4);
 
         // Joystick kanan
-        int z = applyDeadzone(myGamepad->axisRX()/2);
+        int z = applyDeadzone(myGamepad->axisRX()/4);
 
         // Tombol R2 dan L2
         float r2 = (double)myGamepad->brake() / 1020; 
@@ -144,7 +144,7 @@ void loop() {
         Serial.printf("M1: %d | M2: %d | M3: %d | M4: %d\n", m1, m2, m3, m4);
         Serial.printf("target_acc: %.2f | current_acc: %.2f \n", target_acc, current_acc);
         Serial.printf("R1: %d | R2: %d | L1: %d | L2: %d \n", r1, r2, l1, l2);
-        Serial.printf("A: %d | B: %d | C: %d | D: %d \n\n", tombol_a, tombol_b, tombol_c, tombol_d);
+        Serial.printf("A: %d | B: %d | C: %d | D: %d \n\n", tombol_a % 2, tombol_b % 2, tombol_c % 2, tombol_d % 2);
     } else {
         // Jika gamepad terputus, hentikan semua motor
         setMotorSpeed(LEDC_CHANNEL_1A, LEDC_CHANNEL_1B, 0);
