@@ -88,7 +88,7 @@ void loop() {
 
         // Joystick kanan
         int z = applyDeadzone(myGamepad->axisRX()/4);
-
+ 
         // Tombol R2 dan L2
         float r2 = (double)myGamepad->brake() / 1020; 
         float l2 = (double)myGamepad->throttle() / 680;
