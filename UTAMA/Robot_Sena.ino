@@ -103,6 +103,9 @@ void loop() {
         int tombol_c = myGamepad->y(); // atas
         int tombol_d = myGamepad->x(); // kiri
 
+        // D pad
+        int dpad = myGamepad->dpad(); // 1 atas, 2 bawah, 4 kanan, 8 kiri
+
         float target_acc = 1 - r2 + l2; 
         target_acc = constrain(target_acc, 0, 2.04);
 
@@ -133,6 +136,21 @@ void loop() {
         int m3 = constrain(-xLeft + yLeft + z, -125, 125) * current_acc;
         int m4 = constrain(-xLeft - yLeft + z, -125, 125) * current_acc;
 
+        // Kecepatan motor jika memakai dpad
+        if (dpad > 0){
+          if (dpad == 1 || dpad == 9 || dpad == 5){ // atas
+            m1 = 125 * current_acc;
+            m2 = -125 * current_acc;
+            m3 = 125 * current_acc;
+            m4 = -125 * current_acc;
+          } else if (dpad == 2 || dpad == 6 || dpad == 10){ // bawah
+            m1 = -125 * current_acc;
+            m2 = 125 * current_acc;
+            m3 = -125 * current_acc;
+            m4 = 125 * current_acc;
+          } 
+        }
+
         // Set motor berdasarkan nilai yang dihitung
         setMotorSpeed(LEDC_CHANNEL_1A, LEDC_CHANNEL_1B, m1);
         setMotorSpeed(LEDC_CHANNEL_2A, LEDC_CHANNEL_2B, m2);
@@ -144,7 +162,8 @@ void loop() {
         Serial.printf("M1: %d | M2: %d | M3: %d | M4: %d\n", m1, m2, m3, m4);
         Serial.printf("target_acc: %.2f | current_acc: %.2f \n", target_acc, current_acc);
         Serial.printf("R1: %d | R2: %d | L1: %d | L2: %d \n", r1, r2, l1, l2);
-        Serial.printf("A: %d | B: %d | C: %d | D: %d \n\n", tombol_a % 2, tombol_b % 2, tombol_c % 2, tombol_d % 2);
+        Serial.printf("A: %d | B: %d | C: %d | D: %d \n", tombol_a % 2, tombol_b % 2, tombol_c % 2, tombol_d % 2);
+        Serial.printf("DPAD: %d \n\n", dpad);
     } else {
         // Jika gamepad terputus, hentikan semua motor
         setMotorSpeed(LEDC_CHANNEL_1A, LEDC_CHANNEL_1B, 0);
