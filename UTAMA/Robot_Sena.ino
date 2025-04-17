@@ -21,8 +21,33 @@
 #define LEDC_CHANNEL_4A  6  
 #define LEDC_CHANNEL_4B  7  
 
+// Pin Relay
+#define RELAY1 25
+#define RELAY2 26
+#define RELAY3 27
+#define RELAY4 13
+
+// Definisi Motor Driblling
+#define RPWM_PIN5 5
+#define RPWM_PIN6 4
+#define LPWM_PIN7 2
+#define LPWM_PIN8 15
+
+// Definisi IR Sensor Motor
+#define IR_SENSOR_PIN 36
+#define IR_SENSOR_PIN 39
+#define IR_SENSOR_PIN 34
+#define IR_SENSOR_PIN 35
+
+// Create servo
+Servo servo1;
+Servo servo2;
+
+
 #define LEDC_FREQ        5000  
 #define LEDC_RESOLUTION  8
+
+
 
 GamepadPtr myGamepad = nullptr;
 
@@ -73,6 +98,17 @@ void setup() {
     ledcAttachPin(LPWM_PIN3, LEDC_CHANNEL_3B);
     ledcAttachPin(RPWM_PIN4, LEDC_CHANNEL_4A);
     ledcAttachPin(LPWM_PIN4, LEDC_CHANNEL_4B);
+
+
+    // Setup relay
+    pinMode(RELAY1, OUTPUT);
+    pinMode(RELAY2, OUTPUT);
+    pinMode(RELAY3, OUTPUT);
+    pinMode(RELAY4, OUTPUT);
+
+    // Setup servo
+    servo1.attach(16); 
+    servo2.attach(17);
 
     // Inisialisasi Bluetooth Gamepad
     BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
