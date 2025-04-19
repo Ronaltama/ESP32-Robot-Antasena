@@ -1,15 +1,18 @@
 #include <WiFi.h>
 #include <Bluepad32.h>
+#include <Wire.h>
+#include <Adafruit_PWMServoDriver.h>
+
 
 // Definisi Pin Motor
 #define RPWM_PIN1 18
 #define LPWM_PIN1 19
 #define RPWM_PIN2 32
 #define LPWM_PIN2 33
-#define RPWM_PIN3 14
-#define LPWM_PIN3 12
-#define RPWM_PIN4 21
-#define LPWM_PIN4 22
+#define RPWM_PIN3 23
+#define LPWM_PIN3 25
+#define RPWM_PIN4 26
+#define LPWM_PIN4 27
 
 // Definisi Channel LEDC untuk PWM
 #define LEDC_CHANNEL_1A  0  
@@ -22,16 +25,13 @@
 #define LEDC_CHANNEL_4B  7  
 
 // Pin Relay
-#define RELAY1 25
-#define RELAY2 26
-#define RELAY3 27
-#define RELAY4 13
+#define RELAY1 4
+#define RELAY2 5
+#define RELAY3 13
+#define RELAY4 14
+#define RELAY5 15
+#define RELAY6 2
 
-// Definisi Motor Driblling
-#define RPWM_PIN5 5
-#define RPWM_PIN6 4
-#define LPWM_PIN7 2
-#define LPWM_PIN8 15
 
 // Definisi IR Sensor Motor
 #define IR_SENSOR_PIN 36
@@ -39,15 +39,11 @@
 #define IR_SENSOR_PIN 34
 #define IR_SENSOR_PIN 35
 
-// Create servo
-Servo servo1;
-Servo servo2;
-
 
 #define LEDC_FREQ        5000  
 #define LEDC_RESOLUTION  8
 
-
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(); // default address 0x40
 
 GamepadPtr myGamepad = nullptr;
 
@@ -81,6 +77,16 @@ int applyDeadzone(int value) {
     return (abs(value) < DEADZONE) ? 0 : value;
 }
 
+// Fungsi konversi PWM motor (0-255) ke PCA pulse (0-4095)
+int pwmMotorToPulse(int pwmVal) {
+  return map(pwmVal, 0, 255, 0, 4095);
+}
+
+// Fungsi konversi derajat ke pulse servo
+int angleToPulse(int angle) {
+  return map(angle, 0, 180, 150, 600); // kalibrasi sesuai kebutuhan
+}
+
 void setup() {
     Serial.begin(115200);
 
@@ -105,13 +111,18 @@ void setup() {
     pinMode(RELAY2, OUTPUT);
     pinMode(RELAY3, OUTPUT);
     pinMode(RELAY4, OUTPUT);
+    pinMode(RELAY5, OUTPUT);
+    pinMode(RELAY6, OUTPUT);
 
-    // Setup servo
-    servo1.attach(16); 
-    servo2.attach(17);
 
     // Inisialisasi Bluetooth Gamepad
     BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
+
+    Wire.begin(21, 22); // SDA, SCL
+
+    pwm.begin();
+    pwm.setPWMFreq(50);  // Servo pakai 50Hz
+    delay(10);
 }
 
 void loop() {
@@ -186,6 +197,63 @@ void loop() {
             m4 = 125 * current_acc;
           } 
         }
+
+      // Program Pelontar 
+        if (tombol_a == 1){
+          // definisi kecepatan melontar
+          int motorSpeed1 = 150; // 0-255
+          int motorSpeed2 = 150; // 0–255
+          int pulseSpeed1 = pwmMotorToPulse(motorSpeed1);
+          int pulseSpeed2 = pwmMotorToPulse(motorSpeed2);
+
+          // pelontar nyala
+          pwm.setPWM(4, 0, pulseSpeed1); // RPWM motor 1 , nyala
+          pwm.setPWM(5, 0, pulseSpeed2); // LPWM motor 2 , nyala
+          delay(1000);
+          digitalWrite(RELAY1,HIGH);
+          delay(3000);
+          // pelontar mati
+          pwm.setPWM(4, 0, 0); // RPWM motor 1 , mati
+          pwm.setPWM(5, 0, 0); // LPWM motor 2 , mati
+          digitalWrite(RELAY1,LOW);
+        }
+
+      // Program Transform 
+      if (tombol_b == 1) {
+        digitalWrite(RELAY2, HIGH);
+      } 
+
+      // Program Ambil Bola
+      if (tombol_c) {
+        int pulse = angleToPulse(90); // posisi tengah
+        
+        pwm.setPWM(0, 0, pulse);          // Servo1
+        pwm.setPWM(1, pulse, 0);          // Servo2
+        pwm.setPWM(2, 0, pulse);          // Servo3
+        pwm.setPWM(3, pulse, 0);          // Servo4
+
+        delay(500);
+
+        digitalWrite(RELAY3,HIGH);
+        digitalWrite(RELAY4,HIGH);
+        digitalWrite(RELAY5,HIGH);
+        digitalWrite(RELAY6,HIGH);
+
+        delay(3000);
+
+        pwm.setPWM(0, pulse, 0);          // Servo1
+        pwm.setPWM(1, 0, pulse);          // Servo2
+        pwm.setPWM(2, pulse, 0);          // Servo3
+        pwm.setPWM(3, 0, pulse);          // Servo4
+
+        delay(500);
+
+        digitalWrite(RELAY3,LOW);
+        digitalWrite(RELAY4,LOW);
+        digitalWrite(RELAY5,LOW);
+        digitalWrite(RELAY6,LOW);
+      
+      }
 
         // Set motor berdasarkan nilai yang dihitung
         setMotorSpeed(LEDC_CHANNEL_1A, LEDC_CHANNEL_1B, m1);
