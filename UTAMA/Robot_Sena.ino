@@ -1,10 +1,10 @@
+// Import semua library
 #include <WiFi.h>
 #include <Bluepad32.h>
 #include <Wire.h>
 #include <Adafruit_PWMServoDriver.h>
 
-
-// Definisi Pin Motor
+// Definisi Pin Motor (Bawah)
 #define RPWM_PIN1 18
 #define LPWM_PIN1 19
 #define RPWM_PIN2 32
@@ -14,7 +14,7 @@
 #define RPWM_PIN4 26
 #define LPWM_PIN4 27
 
-// Definisi Channel LEDC untuk PWM
+// Definisi Channel LEDC untuk PWM (Motor Bawah)
 #define LEDC_CHANNEL_1A  0  
 #define LEDC_CHANNEL_1B  1  
 #define LEDC_CHANNEL_2A  2  
@@ -24,33 +24,34 @@
 #define LEDC_CHANNEL_4A  6  
 #define LEDC_CHANNEL_4B  7  
 
-// Pin Relay
+// Pin Relay (1 : Pelontar & Drible || 2 : Ganti mode || 3 - 6 : Ambil bola)
 #define RELAY1 4
 #define RELAY2 5
-#define RELAY3 13
+#define RELAY3 13 
 #define RELAY4 14
 #define RELAY5 15
 #define RELAY6 2
 
-
 // Definisi IR Sensor Motor
-#define IR_SENSOR_PIN 36
-#define IR_SENSOR_PIN 39
-#define IR_SENSOR_PIN 34
-#define IR_SENSOR_PIN 35
+#define IR_SENSOR_PIN1 36
+#define IR_SENSOR_PIN2 39
+#define IR_SENSOR_PIN3 34
+#define IR_SENSOR_PIN4 35
 
-
+// Definisi konstanta untuk LEDC (Motor Bawah)
 #define LEDC_FREQ        5000  
 #define LEDC_RESOLUTION  8
 
+// Buat Pin tambahan ESP
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(); // default address 0x40
 
+// Buat Gamepad
 GamepadPtr myGamepad = nullptr;
 
 // Variabel akselerasi & deadzone joystick
-float current_acc = 1.0;
-const float ACC_STEP = 0.1;  // Langkah perubahan akselerasi
-#define DEADZONE 10  
+float current_acc = 1.0; // Akselerasi motor bawah (1 = normal, 2.5 = Cepet, 0 = Stop)
+const float ACC_STEP = 0.1;  // Langkah perubahan akselerasi (Biar ga langsung berhenti)
+#define DEADZONE 10  // Deadzone pada gamepad (kalau kurang dari 10 maka dianggep 0)
 
 // Callback saat gamepad terhubung
 void onConnectedGamepad(GamepadPtr gp) {
@@ -105,7 +106,6 @@ void setup() {
     ledcAttachPin(RPWM_PIN4, LEDC_CHANNEL_4A);
     ledcAttachPin(LPWM_PIN4, LEDC_CHANNEL_4B);
 
-
     // Setup relay
     pinMode(RELAY1, OUTPUT);
     pinMode(RELAY2, OUTPUT);
@@ -114,13 +114,12 @@ void setup() {
     pinMode(RELAY5, OUTPUT);
     pinMode(RELAY6, OUTPUT);
 
-
     // Inisialisasi Bluetooth Gamepad
     BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
 
     Wire.begin(21, 22); // SDA, SCL
 
-    pwm.begin();
+    pwm.begin(); // Motor pada pin tambahan
     pwm.setPWMFreq(50);  // Servo pakai 50Hz
     delay(10);
 }
@@ -128,31 +127,32 @@ void setup() {
 void loop() {
     BP32.update();
 
-    if (myGamepad && myGamepad->isConnected()) {
+    if (myGamepad && myGamepad->isConnected()) { // Hanya berjalan saat gamepad connect
         // Joystick kiri
-        int xLeft = applyDeadzone(-myGamepad->axisX());
-        int yLeft = applyDeadzone(-myGamepad->axisY() + 4);
+        int xLeft = applyDeadzone(-myGamepad->axisX()); // Gerak kanan kiri
+        int yLeft = applyDeadzone(-myGamepad->axisY() + 4); // Gerak depan belakang
 
         // Joystick kanan
-        int z = applyDeadzone(myGamepad->axisRX()/4);
+        int z = applyDeadzone(myGamepad->axisRX()/4); // Buat rotasi
  
         // Tombol R2 dan L2
-        float r2 = (double)myGamepad->brake() / 1020; 
-        float l2 = (double)myGamepad->throttle() / 680;
+        float r2 = (double)myGamepad->brake() / 1020; // Rem
+        float l2 = (double)myGamepad->throttle() / 680; // Gas
 
         // Tombol R1 dan L1
-        int r1 = myGamepad->r1(); // R1
-        int l1 = myGamepad->l1();  // L1
+        int r1 = myGamepad->r1(); // Kecepatan setengah
+        int l1 = myGamepad->l1();  // Berhenti langsung
 
         // Tombol X, Y, A, B
-        int tombol_a = myGamepad->a(); // bawah
-        int tombol_b = myGamepad->b(); // kanan
-        int tombol_c = myGamepad->y(); // atas
+        int tombol_a = myGamepad->a(); // bawah         Y
+        int tombol_b = myGamepad->b(); // kanan       X   B
+        int tombol_c = myGamepad->y(); // atas          A
         int tombol_d = myGamepad->x(); // kiri
 
         // D pad
         int dpad = myGamepad->dpad(); // 1 atas, 2 bawah, 4 kanan, 8 kiri
 
+        // Menghitung perubahan kecepatan
         float target_acc = 1 - r2 + l2; 
         target_acc = constrain(target_acc, 0, 2.04);
 
@@ -183,14 +183,14 @@ void loop() {
         int m3 = constrain(-xLeft + yLeft + z, -125, 125) * current_acc;
         int m4 = constrain(-xLeft - yLeft + z, -125, 125) * current_acc;
 
-        // Kecepatan motor jika memakai dpad
+        // Kecepatan motor jika memakai dpad (Belum dicoba arahnya udah bener atau salah)
         if (dpad > 0){
-          if (dpad == 1 || dpad == 9 || dpad == 5){ // atas
+          if (dpad == 1 || dpad == 9 || dpad == 5){ // maju
             m1 = 125 * current_acc;
             m2 = -125 * current_acc;
             m3 = 125 * current_acc;
             m4 = -125 * current_acc;
-          } else if (dpad == 2 || dpad == 6 || dpad == 10){ // bawah
+          } else if (dpad == 2 || dpad == 6 || dpad == 10){ // mundur
             m1 = -125 * current_acc;
             m2 = 125 * current_acc;
             m3 = -125 * current_acc;
@@ -198,64 +198,150 @@ void loop() {
           } 
         }
 
-      // Program Pelontar 
-        if (tombol_a == 1){
-          // definisi kecepatan melontar
-          int motorSpeed1 = 150; // 0-255
-          int motorSpeed2 = 150; // 0–255
-          int pulseSpeed1 = pwmMotorToPulse(motorSpeed1);
-          int pulseSpeed2 = pwmMotorToPulse(motorSpeed2);
+        // Program kalibrasi disini
+        // {
+        //      Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+        // }
 
-          // pelontar nyala
-          pwm.setPWM(4, 0, pulseSpeed1); // RPWM motor 1 , nyala
-          pwm.setPWM(5, 0, pulseSpeed2); // LPWM motor 2 , nyala
-          delay(1000);
-          digitalWrite(RELAY1,HIGH);
-          delay(3000);
-          // pelontar mati
-          pwm.setPWM(4, 0, 0); // RPWM motor 1 , mati
-          pwm.setPWM(5, 0, 0); // LPWM motor 2 , mati
-          digitalWrite(RELAY1,LOW);
+        // Program Pelontar (buka servo -> nyalain motor -> dorong pake selenoid -> matiin motor -> reset selenoid -> tutup servo)
+        if (tombol_a == 1){ 
+            // Kecepatan max (Belum kalibrasi) Delay belum disesuaikan
+            // Definisi kecepatan melontar
+            int motorSpeed1 = 250; // 0-255
+            int motorSpeed2 = 250; // 0–255
+            int pulseSpeed1 = pwmMotorToPulse(motorSpeed1);
+            int pulseSpeed2 = pwmMotorToPulse(motorSpeed2);
+            int pulse = angleToPulse(90); // Variable servo sudut 90 derajat
+
+            // Buka capit
+            pwm.setPWM(0, 0, pulse);          // Servo1
+            pwm.setPWM(1, pulse, 0);          // Servo2
+            pwm.setPWM(2, 0, pulse);          // Servo3
+            pwm.setPWM(3, pulse, 0);          // Servo4
+
+            delay(100);
+
+            // Nyalain motor
+            pwm.setPWM(4, 0, pulseSpeed1); // RPWM motor 1 , nyala
+            pwm.setPWM(5, 0, pulseSpeed2); // LPWM motor 2 , nyala
+
+            delay(1000);
+
+            // Dorong bola pake selenoid
+            digitalWrite(RELAY1,HIGH);
+
+            delay(3000);
+
+            // Matiin motor
+            pwm.setPWM(4, 0, 0); // RPWM motor 1 , mati
+            pwm.setPWM(5, 0, 0); // LPWM motor 2 , mati
+
+            delay(100);
+
+            // Reset selenoid
+            digitalWrite(RELAY1,LOW);
+
+            delay(100);
+
+            // Tutup capit
+            pwm.setPWM(0, 0, pulse);          // Servo1
+            pwm.setPWM(1, pulse, 0);          // Servo2
+            pwm.setPWM(2, 0, pulse);          // Servo3
+            pwm.setPWM(3, pulse, 0);          // Servo4
         }
 
-      // Program Transform 
-      if (tombol_b == 1) {
-        digitalWrite(RELAY2, HIGH);
-      } 
+        // Program Transform (Belum fix, katanya ganti pake motor)
+        if (tombol_b == 1) {
+            digitalWrite(RELAY2, HIGH);
+        } 
 
-      // Program Ambil Bola
-      if (tombol_c) {
-        int pulse = angleToPulse(90); // posisi tengah
+        // Program Ambil Bola (buka capit -> turunin selenoid -> tutup capit -> naikin selenoid)
+        if (tombol_c) { 
+            // Urutan servo belum disesuaikan sama di robot
+            // Delay juga belum disesuaikan
+
+            int pulse = angleToPulse(90); // Variable pwm sudut 90 derajat
+            
+            // Buka capit
+            pwm.setPWM(0, 0, pulse);          // Servo1
+            pwm.setPWM(1, pulse, 0);          // Servo2
+            pwm.setPWM(2, 0, pulse);          // Servo3
+            pwm.setPWM(3, pulse, 0);          // Servo4
+
+            delay(500);
+
+            // Turunin selenoid
+            digitalWrite(RELAY3,HIGH);
+            digitalWrite(RELAY4,HIGH);
+            digitalWrite(RELAY5,HIGH);
+            digitalWrite(RELAY6,HIGH);
+
+            delay(2000);
+
+            // Tutup capit
+            pwm.setPWM(0, pulse, 0);          // Servo1
+            pwm.setPWM(1, 0, pulse);          // Servo2
+            pwm.setPWM(2, pulse, 0);          // Servo3
+            pwm.setPWM(3, 0, pulse);          // Servo4
+
+            delay(500);
+
+            // Naikin selenoid
+            digitalWrite(RELAY3,LOW);
+            digitalWrite(RELAY4,LOW);
+            digitalWrite(RELAY5,LOW);
+            digitalWrite(RELAY6,LOW);
         
-        pwm.setPWM(0, 0, pulse);          // Servo1
-        pwm.setPWM(1, pulse, 0);          // Servo2
-        pwm.setPWM(2, 0, pulse);          // Servo3
-        pwm.setPWM(3, pulse, 0);          // Servo4
+        }
 
-        delay(500);
+        // Program Drible (Pelontar tapi lebih pelan) (buka servo -> nyalain motor -> dorong pake selenoid -> matiin motor -> reset selenoid -> tutup servo)
+        if (tombol_d == 1){ 
+            // Kecepatan max (Belum kalibrasi) Delay belum disesuaikan
+            // Definisi kecepatan melontar
+            int motorSpeed1 = 100; // 0-255
+            int motorSpeed2 = 100; // 0–255
+            int pulseSpeed1 = pwmMotorToPulse(motorSpeed1);
+            int pulseSpeed2 = pwmMotorToPulse(motorSpeed2);
+            int pulse = angleToPulse(90); // Variable servo sudut 90 derajat
 
-        digitalWrite(RELAY3,HIGH);
-        digitalWrite(RELAY4,HIGH);
-        digitalWrite(RELAY5,HIGH);
-        digitalWrite(RELAY6,HIGH);
+            // Buka capit
+            pwm.setPWM(0, 0, pulse);          // Servo1
+            pwm.setPWM(1, pulse, 0);          // Servo2
+            pwm.setPWM(2, 0, pulse);          // Servo3
+            pwm.setPWM(3, pulse, 0);          // Servo4
 
-        delay(3000);
+            delay(100);
 
-        pwm.setPWM(0, pulse, 0);          // Servo1
-        pwm.setPWM(1, 0, pulse);          // Servo2
-        pwm.setPWM(2, pulse, 0);          // Servo3
-        pwm.setPWM(3, 0, pulse);          // Servo4
+            // Nyalain motor
+            pwm.setPWM(4, 0, pulseSpeed1); // RPWM motor 1 , nyala
+            pwm.setPWM(5, 0, pulseSpeed2); // LPWM motor 2 , nyala
 
-        delay(500);
+            delay(1000);
 
-        digitalWrite(RELAY3,LOW);
-        digitalWrite(RELAY4,LOW);
-        digitalWrite(RELAY5,LOW);
-        digitalWrite(RELAY6,LOW);
-      
-      }
+            // Dorong bola pake selenoid
+            digitalWrite(RELAY1,HIGH);
 
-        // Set motor berdasarkan nilai yang dihitung
+            delay(1000);
+
+            // Matiin motor
+            pwm.setPWM(4, 0, 0); // RPWM motor 1 , mati
+            pwm.setPWM(5, 0, 0); // LPWM motor 2 , mati
+
+            delay(100);
+
+            // Reset selenoid
+            digitalWrite(RELAY1,LOW);
+
+            delay(100);
+
+            // Tutup capit
+            pwm.setPWM(0, 0, pulse);          // Servo1
+            pwm.setPWM(1, pulse, 0);          // Servo2
+            pwm.setPWM(2, 0, pulse);          // Servo3
+            pwm.setPWM(3, pulse, 0);          // Servo4
+        }
+
+        // Set motor bawah berdasarkan nilai yang dihitung
         setMotorSpeed(LEDC_CHANNEL_1A, LEDC_CHANNEL_1B, m1);
         setMotorSpeed(LEDC_CHANNEL_2A, LEDC_CHANNEL_2B, m2);
         setMotorSpeed(LEDC_CHANNEL_3A, LEDC_CHANNEL_3B, m3);
@@ -275,4 +361,4 @@ void loop() {
         setMotorSpeed(LEDC_CHANNEL_3A, LEDC_CHANNEL_3B, 0);
         setMotorSpeed(LEDC_CHANNEL_4A, LEDC_CHANNEL_4B, 0);
     }
-}
+} 
