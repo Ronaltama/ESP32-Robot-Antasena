@@ -2,7 +2,7 @@
 #include <WiFi.h>
 #include <Bluepad32.h>
 #include <Wire.h>
-#include <Adafruit_PWMServoDriver.h>
+#include <ESP32Servo.h>
 
 // Definisi Pin Motor (Bawah)
 #define RPWM_PIN1 18
@@ -24,26 +24,25 @@
 #define LEDC_CHANNEL_4A  6  
 #define LEDC_CHANNEL_4B  7  
 
-// Pin Relay (1 : Pelontar & Drible || 2 : Ganti mode || 3 - 6 : Ambil bola)
-#define RELAY1 4
-#define RELAY2 5
-#define RELAY3 13 
-#define RELAY4 14
-#define RELAY5 15
-#define RELAY6 2
 
-// Definisi IR Sensor Motor
-#define IR_SENSOR_PIN1 36
-#define IR_SENSOR_PIN2 39
-#define IR_SENSOR_PIN3 34
-#define IR_SENSOR_PIN4 35
+// Pin Relay
+#define RELAY1 14
+#define RELAY2 15
+
+// Create servo
+Servo servo1;
+Servo servo2;
+
+// Pelontar
+#define RPWM_PIN5 21
+#define LPWM_PIN6 22
+
 
 // Definisi konstanta untuk LEDC (Motor Bawah)
 #define LEDC_FREQ        5000  
 #define LEDC_RESOLUTION  8
 
-// Buat Pin tambahan ESP
-Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(); // default address 0x40
+
 
 // Buat Gamepad
 GamepadPtr myGamepad = nullptr;
@@ -78,15 +77,6 @@ int applyDeadzone(int value) {
     return (abs(value) < DEADZONE) ? 0 : value;
 }
 
-// Fungsi konversi PWM motor (0-255) ke PCA pulse (0-4095)
-int pwmMotorToPulse(int pwmVal) {
-  return map(pwmVal, 0, 255, 0, 4095);
-}
-
-// Fungsi konversi derajat ke pulse servo
-int angleToPulse(int angle) {
-  return map(angle, 0, 180, 150, 600); // kalibrasi sesuai kebutuhan
-}
 
 void setup() {
     Serial.begin(115200);
@@ -109,19 +99,18 @@ void setup() {
     // Setup relay
     pinMode(RELAY1, OUTPUT);
     pinMode(RELAY2, OUTPUT);
-    pinMode(RELAY3, OUTPUT);
-    pinMode(RELAY4, OUTPUT);
-    pinMode(RELAY5, OUTPUT);
-    pinMode(RELAY6, OUTPUT);
+
+
+    // Setup servo
+    servo1.attach(4); 
+    servo2.attach(13);
 
     // Inisialisasi Bluetooth Gamepad
     BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
 
-    Wire.begin(21, 22); // SDA, SCL
-
-    pwm.begin(); // Motor pada pin tambahan
-    pwm.setPWMFreq(50);  // Servo pakai 50Hz
-    delay(10);
+    // Motor Pelontar
+    pinMode(RPWM_PIN5, OUTPUT);
+    pinMode(LPWM_PIN6, OUTPUT);
 }
 
 void loop() {
@@ -198,148 +187,46 @@ void loop() {
           } 
         }
 
-        // Program kalibrasi disini
-        // {
-        //      Lorem ipsum dolor sit amet, consectetur adipiscing elit.
-        // }
 
-        // Program Pelontar (buka servo -> nyalain motor -> dorong pake selenoid -> matiin motor -> reset selenoid -> tutup servo)
+        // Driblling
         if (tombol_a == 1){ 
-            // Kecepatan max (Belum kalibrasi) Delay belum disesuaikan
-            // Definisi kecepatan melontar
-            int motorSpeed1 = 250; // 0-255
-            int motorSpeed2 = 250; // 0–255
-            int pulseSpeed1 = pwmMotorToPulse(motorSpeed1);
-            int pulseSpeed2 = pwmMotorToPulse(motorSpeed2);
-            int pulse = angleToPulse(90); // Variable servo sudut 90 derajat
 
-            // Buka capit
-            pwm.setPWM(0, 0, pulse);          // Servo1
-            pwm.setPWM(1, pulse, 0);          // Servo2
-            pwm.setPWM(2, 0, pulse);          // Servo3
-            pwm.setPWM(3, pulse, 0);          // Servo4
-
-            delay(100);
-
-            // Nyalain motor
-            pwm.setPWM(4, 0, pulseSpeed1); // RPWM motor 1 , nyala
-            pwm.setPWM(5, 0, pulseSpeed2); // LPWM motor 2 , nyala
-
-            delay(1000);
-
-            // Dorong bola pake selenoid
-            digitalWrite(RELAY1,HIGH);
-
-            delay(3000);
-
-            // Matiin motor
-            pwm.setPWM(4, 0, 0); // RPWM motor 1 , mati
-            pwm.setPWM(5, 0, 0); // LPWM motor 2 , mati
-
-            delay(100);
-
-            // Reset selenoid
-            digitalWrite(RELAY1,LOW);
-
-            delay(100);
-
-            // Tutup capit
-            pwm.setPWM(0, 0, pulse);          // Servo1
-            pwm.setPWM(1, pulse, 0);          // Servo2
-            pwm.setPWM(2, 0, pulse);          // Servo3
-            pwm.setPWM(3, pulse, 0);          // Servo4
+        servo1.write(90);
+        servo2.write(0);
+        digitalWrite(RELAY1, HIGH);
+        delay(100);
+        digitalWrite(RELAY1, LOW);
+        delay(2000);
+        servo1.write(0);
+        servo2.write(90);
         }
 
-        // Program Transform (Belum fix, katanya ganti pake motor)
+        // Passing Kenceng
         if (tombol_b == 1) {
-            digitalWrite(RELAY2, HIGH);
+        analogWrite(RPWM_PIN5, 255);
+        analogWrite(LPWM_PIN6, 255);
+        delay(500);
+        digitalWrite(RELAY2, HIGH);
+
+        delay(2000);
+        digitalWrite(RELAY2, LOW);
+        analogWrite(RPWM_PIN5, 0);
+        analogWrite(LPWM_PIN6, 0);
         } 
 
-        // Program Ambil Bola (buka capit -> turunin selenoid -> tutup capit -> naikin selenoid)
+        // Passing pelan
         if (tombol_c) { 
-            // Urutan servo belum disesuaikan sama di robot
-            // Delay juga belum disesuaikan
+        analogWrite(RPWM_PIN5, 125);
+        analogWrite(LPWM_PIN6, 125);
+        delay(500);
+        digitalWrite(RELAY2, HIGH);
 
-            int pulse = angleToPulse(90); // Variable pwm sudut 90 derajat
-            
-            // Buka capit
-            pwm.setPWM(0, 0, pulse);          // Servo1
-            pwm.setPWM(1, pulse, 0);          // Servo2
-            pwm.setPWM(2, 0, pulse);          // Servo3
-            pwm.setPWM(3, pulse, 0);          // Servo4
-
-            delay(500);
-
-            // Turunin selenoid
-            digitalWrite(RELAY3,HIGH);
-            digitalWrite(RELAY4,HIGH);
-            digitalWrite(RELAY5,HIGH);
-            digitalWrite(RELAY6,HIGH);
-
-            delay(2000);
-
-            // Tutup capit
-            pwm.setPWM(0, pulse, 0);          // Servo1
-            pwm.setPWM(1, 0, pulse);          // Servo2
-            pwm.setPWM(2, pulse, 0);          // Servo3
-            pwm.setPWM(3, 0, pulse);          // Servo4
-
-            delay(500);
-
-            // Naikin selenoid
-            digitalWrite(RELAY3,LOW);
-            digitalWrite(RELAY4,LOW);
-            digitalWrite(RELAY5,LOW);
-            digitalWrite(RELAY6,LOW);
-        
+        delay(2000);
+        digitalWrite(RELAY2, LOW);
+        analogWrite(RPWM_PIN5, 0);
+        analogWrite(LPWM_PIN6, 0);
         }
 
-        // Program Drible (Pelontar tapi lebih pelan) (buka servo -> nyalain motor -> dorong pake selenoid -> matiin motor -> reset selenoid -> tutup servo)
-        if (tombol_d == 1){ 
-            // Kecepatan max (Belum kalibrasi) Delay belum disesuaikan
-            // Definisi kecepatan melontar
-            int motorSpeed1 = 100; // 0-255
-            int motorSpeed2 = 100; // 0–255
-            int pulseSpeed1 = pwmMotorToPulse(motorSpeed1);
-            int pulseSpeed2 = pwmMotorToPulse(motorSpeed2);
-            int pulse = angleToPulse(90); // Variable servo sudut 90 derajat
-
-            // Buka capit
-            pwm.setPWM(0, 0, pulse);          // Servo1
-            pwm.setPWM(1, pulse, 0);          // Servo2
-            pwm.setPWM(2, 0, pulse);          // Servo3
-            pwm.setPWM(3, pulse, 0);          // Servo4
-
-            delay(100);
-
-            // Nyalain motor
-            pwm.setPWM(4, 0, pulseSpeed1); // RPWM motor 1 , nyala
-            pwm.setPWM(5, 0, pulseSpeed2); // LPWM motor 2 , nyala
-
-            delay(1000);
-
-            // Dorong bola pake selenoid
-            digitalWrite(RELAY1,HIGH);
-
-            delay(1000);
-
-            // Matiin motor
-            pwm.setPWM(4, 0, 0); // RPWM motor 1 , mati
-            pwm.setPWM(5, 0, 0); // LPWM motor 2 , mati
-
-            delay(100);
-
-            // Reset selenoid
-            digitalWrite(RELAY1,LOW);
-
-            delay(100);
-
-            // Tutup capit
-            pwm.setPWM(0, 0, pulse);          // Servo1
-            pwm.setPWM(1, pulse, 0);          // Servo2
-            pwm.setPWM(2, 0, pulse);          // Servo3
-            pwm.setPWM(3, pulse, 0);          // Servo4
-        }
 
         // Set motor bawah berdasarkan nilai yang dihitung
         setMotorSpeed(LEDC_CHANNEL_1A, LEDC_CHANNEL_1B, m1);
