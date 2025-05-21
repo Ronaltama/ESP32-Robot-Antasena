@@ -125,8 +125,8 @@ void loop() {
         int z = applyDeadzone(myGamepad->axisRX()/4); // Buat rotasi
  
         // Tombol R2 dan L2
-        float r2 = (double)myGamepad->brake() / 1020; // Rem
-        float l2 = (double)myGamepad->throttle() / 680; // Gas
+        float r2 = (double)myGamepad->brake() / 680; // Gas
+        float l2 = (double)myGamepad->throttle() / 1020; // Rem
 
         // Tombol R1 dan L1
         int r1 = myGamepad->r1(); // Kecepatan setengah
@@ -142,7 +142,7 @@ void loop() {
         int dpad = myGamepad->dpad(); // 1 atas, 2 bawah, 4 kanan, 8 kiri
 
         // Menghitung perubahan kecepatan
-        float target_acc = 1 - r2 + l2; 
+        float target_acc = 1 + r2 - l2; 
         target_acc = constrain(target_acc, 0, 2.04);
 
         // Jika L1 ditekan, langsung berhenti (current_acc = 0)
