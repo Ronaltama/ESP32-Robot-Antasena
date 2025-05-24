@@ -1,10 +1,10 @@
-// Import semua library
 #include <WiFi.h>
 #include <Bluepad32.h>
 #include <Wire.h>
-#include <ESP32Servo.h>
+#include <Adafruit_PWMServoDriver.h>
 
-// Definisi Pin Motor (Bawah)
+
+// Definisi Pin Motor Bawah
 #define RPWM_PIN1 18
 #define LPWM_PIN1 19
 #define RPWM_PIN2 32
@@ -14,7 +14,7 @@
 #define RPWM_PIN4 26
 #define LPWM_PIN4 27
 
-// Definisi Channel LEDC untuk PWM (Motor Bawah)
+// Definisi Channel LEDC untuk PWM
 #define LEDC_CHANNEL_1A  0  
 #define LEDC_CHANNEL_1B  1  
 #define LEDC_CHANNEL_2A  2  
@@ -24,33 +24,21 @@
 #define LEDC_CHANNEL_4A  6  
 #define LEDC_CHANNEL_4B  7  
 
-
 // Pin Relay
-#define RELAY1 14
-#define RELAY2 15
+#define RELAY1 16  // DRIBBLING
+#define RELAY2 17  // PASSING
 
-// Create servo
-Servo servo1;
-Servo servo2;
-
-// Pelontar
-#define RPWM_PIN5 21
-#define LPWM_PIN6 22
-
-
-// Definisi konstanta untuk LEDC (Motor Bawah)
 #define LEDC_FREQ        5000  
 #define LEDC_RESOLUTION  8
 
+Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(); // default address 0x40
 
-
-// Buat Gamepad
 GamepadPtr myGamepad = nullptr;
 
 // Variabel akselerasi & deadzone joystick
-float current_acc = 1.0; // Akselerasi motor bawah (1 = normal, 2.5 = Cepet, 0 = Stop)
-const float ACC_STEP = 0.1;  // Langkah perubahan akselerasi (Biar ga langsung berhenti)
-#define DEADZONE 10  // Deadzone pada gamepad (kalau kurang dari 10 maka dianggep 0)
+float current_acc = 1.0;
+const float ACC_STEP = 0.1;  // Langkah perubahan akselerasi
+#define DEADZONE 10  
 
 // Callback saat gamepad terhubung
 void onConnectedGamepad(GamepadPtr gp) {
@@ -77,6 +65,15 @@ int applyDeadzone(int value) {
     return (abs(value) < DEADZONE) ? 0 : value;
 }
 
+// Fungsi konversi PWM motor (0-255) ke PCA pulse (0-4095)
+int pwmMotorToPulse(int pwmVal) {
+  return map(pwmVal, 0, 255, 0, 4095);
+}
+
+// Fungsi konversi derajat ke pulse servo
+int angleToPulse(int angle) {
+  return map(angle, 0, 180, 150, 600); // kalibrasi sesuai kebutuhan
+}
 
 void setup() {
     Serial.begin(115200);
@@ -96,53 +93,51 @@ void setup() {
     ledcAttachPin(RPWM_PIN4, LEDC_CHANNEL_4A);
     ledcAttachPin(LPWM_PIN4, LEDC_CHANNEL_4B);
 
+
     // Setup relay
     pinMode(RELAY1, OUTPUT);
     pinMode(RELAY2, OUTPUT);
 
 
-    // Setup servo
-    servo1.attach(4); 
-    servo2.attach(13);
-
     // Inisialisasi Bluetooth Gamepad
     BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
 
-    // Motor Pelontar
-    pinMode(RPWM_PIN5, OUTPUT);
-    pinMode(LPWM_PIN6, OUTPUT);
+    Wire.begin(21, 22); // SDA, SCL ... UNTUK EXTENDER PWM
+
+    pwm.begin();
+    pwm.setPWMFreq(50);  // Servo pakai 50Hz
+    delay(10);
 }
 
 void loop() {
     BP32.update();
 
-    if (myGamepad && myGamepad->isConnected()) { // Hanya berjalan saat gamepad connect
+    if (myGamepad && myGamepad->isConnected()) {
         // Joystick kiri
-        int xLeft = applyDeadzone(-myGamepad->axisX()); // Gerak kanan kiri
-        int yLeft = applyDeadzone(-myGamepad->axisY() + 4); // Gerak depan belakang
+        int xLeft = applyDeadzone(-myGamepad->axisX());
+        int yLeft = applyDeadzone(-myGamepad->axisY() + 4);
 
         // Joystick kanan
-        int z = applyDeadzone(myGamepad->axisRX()/4); // Buat rotasi
+        int z = applyDeadzone(myGamepad->axisRX()/4);
  
         // Tombol R2 dan L2
-        float r2 = (double)myGamepad->brake() / 680; // Gas
-        float l2 = (double)myGamepad->throttle() / 1020; // Rem
+        float r2 = (double)myGamepad->brake() / 1020; 
+        float l2 = (double)myGamepad->throttle() / 680;
 
         // Tombol R1 dan L1
-        int r1 = myGamepad->r1(); // Kecepatan setengah
-        int l1 = myGamepad->l1();  // Berhenti langsung
+        int r1 = myGamepad->r1(); // R1
+        int l1 = myGamepad->l1();  // L1
 
         // Tombol X, Y, A, B
-        int tombol_a = myGamepad->a(); // bawah         Y
-        int tombol_b = myGamepad->b(); // kanan       X   B
-        int tombol_c = myGamepad->y(); // atas          A
+        int tombol_a = myGamepad->a(); // bawah
+        int tombol_b = myGamepad->b(); // kanan
+        int tombol_c = myGamepad->y(); // atas
         int tombol_d = myGamepad->x(); // kiri
 
         // D pad
         int dpad = myGamepad->dpad(); // 1 atas, 2 bawah, 4 kanan, 8 kiri
 
-        // Menghitung perubahan kecepatan
-        float target_acc = 1 + r2 - l2; 
+        float target_acc = 1 - r2 + l2; 
         target_acc = constrain(target_acc, 0, 2.04);
 
         // Jika L1 ditekan, langsung berhenti (current_acc = 0)
@@ -172,14 +167,14 @@ void loop() {
         int m3 = constrain(-xLeft + yLeft + z, -125, 125) * current_acc;
         int m4 = constrain(-xLeft - yLeft + z, -125, 125) * current_acc;
 
-        // Kecepatan motor jika memakai dpad (Belum dicoba arahnya udah bener atau salah)
+        // Kecepatan motor jika memakai dpad
         if (dpad > 0){
-          if (dpad == 1 || dpad == 9 || dpad == 5){ // maju
+          if (dpad == 1 || dpad == 9 || dpad == 5){ // atas
             m1 = 125 * current_acc;
             m2 = -125 * current_acc;
             m3 = 125 * current_acc;
             m4 = -125 * current_acc;
-          } else if (dpad == 2 || dpad == 6 || dpad == 10){ // mundur
+          } else if (dpad == 2 || dpad == 6 || dpad == 10){ // bawah
             m1 = -125 * current_acc;
             m2 = 125 * current_acc;
             m3 = -125 * current_acc;
@@ -187,48 +182,76 @@ void loop() {
           } 
         }
 
+      // Program Dribbling
+        if (tombol_a == 1){
+          int pulse = angleToPulse(90); // posisi tengah
+          digitalWrite(RELAY1, HIGH);
+          pwm.setPWM(4, pulse, 0);          // Servo1
+          pwm.setPWM(5, 0, pulse);          // Servo2
+          delay(200);
+          digitalWrite(RELAY1, LOW);
+          delay(200);
+          pwm.setPWM(4, 0, pulse);          // Servo1
+          pwm.setPWM(5, pulse, 0);          // Servo2
 
-        // Driblling
-        if (tombol_a == 1){ 
-
-        servo1.write(90);
-        servo2.write(0);
-        digitalWrite(RELAY1, HIGH);
-        delay(100);
-        digitalWrite(RELAY1, LOW);
-        delay(2000);
-        servo1.write(0);
-        servo2.write(90);
+          Serial.println("Dribble");
         }
 
-        // Passing Kenceng
-        if (tombol_b == 1) {
-        analogWrite(RPWM_PIN5, 255);
-        analogWrite(LPWM_PIN6, 255);
-        delay(500);
-        digitalWrite(RELAY2, HIGH);
+      // Program Transform 
+      if (tombol_b == 1) {
+          int motorSpeed1 = 30; // 0-255
+          int motorSpeed2 = 30; // 0–255
+          int pulseSpeed1 = pwmMotorToPulse(motorSpeed1);
+          int pulseSpeed2 = pwmMotorToPulse(motorSpeed2);
 
-        delay(2000);
-        digitalWrite(RELAY2, LOW);
-        analogWrite(RPWM_PIN5, 0);
-        analogWrite(LPWM_PIN6, 0);
-        } 
+          // pelontar nyala
+          pwm.setPWM(1, 0, pulseSpeed1); // RPWM motor 1 , nyala
+          pwm.setPWM(2, 0, pulseSpeed2); // LPWM motor 2 , nyala
+          delay(1000);
 
-        // Passing pelan
-        if (tombol_c) { 
-        analogWrite(RPWM_PIN5, 125);
-        analogWrite(LPWM_PIN6, 125);
-        delay(500);
-        digitalWrite(RELAY2, HIGH);
+          // pelontar mati
+          pwm.setPWM(1, 0, 0); // RPWM motor 1 , mati
+          pwm.setPWM(2, 0, 0); // LPWM motor 2 , mati
 
-        delay(2000);
-        digitalWrite(RELAY2, LOW);
-        analogWrite(RPWM_PIN5, 0);
-        analogWrite(LPWM_PIN6, 0);
-        }
+          Serial.println("Transform");
+      } 
 
+      // Program Pelontar
+      if (tombol_c == 1) {
+      digitalWrite(RELAY2, HIGH);
+      delay(1000);
+      digitalWrite(RELAY2, LOW);
 
-        // Set motor bawah berdasarkan nilai yang dihitung
+      Serial.println("Passing");
+      }
+
+      // Program Pindah Bola ke Paasing
+      if (tombol_d == 1) {
+          int motorSpeed1 = 30; // 0-255
+          int motorSpeed2 = 30; // 0–255
+          int pulseSpeed1 = pwmMotorToPulse(motorSpeed1);
+          int pulseSpeed2 = pwmMotorToPulse(motorSpeed2);
+
+          pwm.setPWM(0, 0, pulseSpeed1); // RPWM motor 1 , nyala
+          pwm.setPWM(3, 0, pulseSpeed2); // LPWM motor 2 , nyala
+          delay(1000);
+
+          pwm.setPWM(0, 0, 0); // RPWM motor 1 , mati
+          pwm.setPWM(3, 0, 0); // LPWM motor 2 , mati
+          
+          int pulse = angleToPulse(90); // posisi tengah
+          pwm.setPWM(4, pulse, 0);          // Servo1
+          pwm.setPWM(5, 0, pulse);          // Servo2
+
+          delay(1000);
+          pwm.setPWM(4, 0, pulse);          // Servo1
+          pwm.setPWM(5, pulse, 0);          // Servo2
+
+          Serial.println("Pindah");
+
+      } 
+
+        // Set motor berdasarkan nilai yang dihitung
         setMotorSpeed(LEDC_CHANNEL_1A, LEDC_CHANNEL_1B, m1);
         setMotorSpeed(LEDC_CHANNEL_2A, LEDC_CHANNEL_2B, m2);
         setMotorSpeed(LEDC_CHANNEL_3A, LEDC_CHANNEL_3B, m3);
@@ -248,4 +271,4 @@ void loop() {
         setMotorSpeed(LEDC_CHANNEL_3A, LEDC_CHANNEL_3B, 0);
         setMotorSpeed(LEDC_CHANNEL_4A, LEDC_CHANNEL_4B, 0);
     }
-} 
+}
