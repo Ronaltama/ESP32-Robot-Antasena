@@ -1,4 +1,4 @@
-const int sensorPin = 23; // Pin sensor
+const int sensorPin = 15; // Pin sensor
 
 bool pulseReady = true;
 unsigned long lastTime = 0;
